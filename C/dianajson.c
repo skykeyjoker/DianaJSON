@@ -41,7 +41,7 @@ static int diana_parse_null(diana_context *c, diana_value *v)
 /* true = "true" */
 static int diana_parse_true(diana_context *c, diana_value *v)
 {
-    EXPECT(c, "t");
+    EXPECT(c, 't');
     if (c->json[0] != 'r' || c->json[1] != 'u' || c->json[2] != 'e')
         return DIANA_PARSE_INVALID_VALUE;
     c->json += 3;
@@ -53,7 +53,7 @@ static int diana_parse_true(diana_context *c, diana_value *v)
 /* false = "false" */
 static int diana_parse_false(diana_context *c, diana_value *v)
 {
-    EXPECT(c, "f");
+    EXPECT(c, 'f');
     if (c->json[0] != 'a' || c->json[1] != 'l' || c->json[2] != 's' || c->json[3] != 'e')
         return DIANA_PARSE_INVALID_VALUE;
     c->json += 4;
