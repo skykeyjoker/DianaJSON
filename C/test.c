@@ -27,14 +27,50 @@ static int test_pass = 0;
 static void test_parse_null()
 {
     diana_value v;
-    v.type = DIANA_TRUE;
+    v.type = DIANA_FALSE;
     EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v, "null"));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+}
+
+static void test_parse_expect_value()
+{
+    diana_value v;
+
+    v.type = DIANA_FALSE;
+    EXPECT_EQ_INT(DIANA_PARSE_EXPECT_VALUE, diana_parse(&v, ""));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+
+    v.type = DIANA_FALSE;
+    EXPECT_EQ_INT(DIANA_PARSE_EXPECT_VALUE, diana_parse(&v, " "));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+}
+
+static void test_parse_invalid_value()
+{
+    diana_value v;
+    v.type = DIANA_FALSE;
+    EXPECT_EQ_INT(DIANA_PARSE_INVALID_VALUE, diana_parse(&v, "nul"));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+
+    v.type = DIANA_FALSE;
+    EXPECT_EQ_INT(DIANA_PARSE_INVALID_VALUE, diana_parse(&v, "?"));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+}
+
+static void test_parse_root_not_singular()
+{
+    diana_value v;
+    v.type = DIANA_FALSE;
+    EXPECT_EQ_INT(DIANA_PARSE_ROOT_NOT_SINGULAR, diana_parse(&v, "null x"));
     EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
 }
 
 static void test_parse()
 {
     test_parse_null();
+    test_parse_expect_value();
+    test_parse_invalid_value();
+    test_parse_root_not_singular();
 }
 
 int main()

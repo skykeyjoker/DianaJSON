@@ -31,7 +31,7 @@ enum
 };
 
 /* JSON解析 */
-int lept_parse(diana_value *v, const char *json); // 解析JSON，根节点指针v是由使用方负责分配
+int diana_parse(diana_value *v, const char *json); // 解析JSON，根节点指针v是由使用方负责分配
 
 /* 获取访问结果函数，获取其类型 */
 diana_type diana_get_type(const diana_value *v);
