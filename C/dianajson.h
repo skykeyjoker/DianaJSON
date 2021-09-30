@@ -18,6 +18,7 @@ typedef enum
 /* 树形结构 */
 typedef struct
 {
+    double n;
     diana_type type;
 } diana_value; // 树形结构的每个节点使用diana_value表示，也称它为一个值（JSON Value）。
 
@@ -25,9 +26,10 @@ typedef struct
 enum
 {
     DIANA_PARSE_OK = 0,
-    DIANA_PARSE_EXPECT_VALUE,     // JSON只含有空白
-    DIANA_PARSE_INVALID_VALUE,    // 属于非法字面值
-    DIANA_PARSE_ROOT_NOT_SINGULAR // 若一个值之后，在空白之后还有其他字符
+    DIANA_PARSE_EXPECT_VALUE,      // JSON只含有空白
+    DIANA_PARSE_INVALID_VALUE,     // 属于非法字面值
+    DIANA_PARSE_ROOT_NOT_SINGULAR, // 若一个值之后，在空白之后还有其他字符
+    DIANA_PARSE_NUMBER_TOO_BIG     // 数字过大
 };
 
 /* JSON解析 */
@@ -35,5 +37,8 @@ int diana_parse(diana_value *v, const char *json); // 解析JSON，根节点指�
 
 /* 获取访问结果函数，获取其类型 */
 diana_type diana_get_type(const diana_value *v);
+
+/* 获取数值型数据API */
+double diana_get_number(const diana_value *v);
 
 #endif /* DIANAJSON */
