@@ -168,10 +168,47 @@ static int diana_parse_string(diana_context *c, diana_value *v)
             diana_set_string(v, (const char *)diana_context_pop(c, len), len);
             c->json = p;
             return DIANA_PARSE_OK;
+        case '\\':
+            switch (*p++)
+            {
+            case '\"':
+                PUTC(c, '\"');
+                break;
+            case '\\':
+                PUTC(c, '\\');
+                break;
+            case '/':
+                PUTC(c, '/');
+                break;
+            case 'b':
+                PUTC(c, '\b');
+                break;
+            case 'f':
+                PUTC(c, '\f');
+                break;
+            case 'n':
+                PUTC(c, '\n');
+                break;
+            case 'r':
+                PUTC(c, '\r');
+                break;
+            case 't':
+                PUTC(c, '\t');
+                break;
+            default:
+                c->top = head;
+                return DIANA_PARSE_INVALID_STRING_ESCAPE;
+            }
+            break;
         case '\0':
             c->top = head;
             return DIANA_PARSE_MISS_QUOTATION_MARK;
         default:
+            if ((unsigned char)ch < 0x20)
+            {
+                c->top = head;
+                return DIANA_PARSE_INVALID_STRING_CHAR;
+            }
             PUTC(c, ch);
         }
     }
@@ -240,15 +277,13 @@ diana_type diana_get_type(const diana_value *v)
 
 int diana_get_boolean(const diana_value *v)
 {
-    /* TODO */
     assert(v != NULL && (v->type == DIANA_TRUE || v->type == DIANA_FALSE));
     return v->type == DIANA_TRUE ? 1 : 0;
 }
 
 void diana_set_boolean(diana_value *v, int b)
 {
-    /* TODO */
-    assert(v != NULL && (b == 0 || b == 1));
+    diana_free(v);
     v->type = (b == 1 ? DIANA_TRUE : DIANA_FALSE);
 }
 
@@ -260,8 +295,7 @@ double diana_get_number(const diana_value *v)
 
 void diana_set_number(diana_value *v, double n)
 {
-    /* TODO */
-    assert(v != NULL);
+    diana_free(v);
     v->u.n = n;
     v->type = DIANA_NUMBER;
 }
