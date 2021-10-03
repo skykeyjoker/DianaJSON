@@ -1,9 +1,15 @@
 #include "dianajson.h"
-#include <assert.h>
+#include <assert.h> /* assert() */
 #include <stddef.h>
 #include <stdlib.h>
-#include <errno.h> /* errno, ERANGE */
-#include <math.h>  /* HUGE_VAL */
+#include <errno.h>  /* errno, ERANGE */
+#include <math.h>   /* HUGE_VAL */
+#include <string.h> /* memcpy() */
+
+/* 使用者可在编译选项中自行设置DIANA_PARSE_STACK_INIT_SIZE宏 */
+#ifndef DIANA_PARSE_STACK_INIT_SIZE
+#define DIANA_PARSE_STACK_INIT_SIZE 256
+#endif
 
 #define EXPECT(c, ch)             \
     do                            \
@@ -11,6 +17,7 @@
         assert(*c->json == (ch)); \
         c->json++;                \
     } while (0)
+
 #define ISDIGIT(ch) ((ch) >= '0' && (ch) <= '9')
 #define ISDIGIT1TO9(ch) ((ch) >= '1' && (ch) <= '9')
 
@@ -18,7 +25,38 @@
 typedef struct
 {
     const char *json;
+    char *stack;
+    size_t size, top; // size当前堆栈容量，top栈顶位置
 } diana_context;
+
+static void *diana_context_push(diana_context *c, size_t size)
+{
+    void *ret;
+    assert(size > 0);
+    if (c->top + size >= c->size)
+    {
+        if (c->size == 0)
+            c->size = DIANA_PARSE_STACK_INIT_SIZE;
+        while (c->top + size >= c->size)
+            c->size += c->size >> 1; // 1.5倍扩展
+        c->stack = (char *)realloc(c->stack, c->size);
+    }
+    ret = c->stack + c->top; // 返回数据起始的指针
+    c->top += size;
+    return ret;
+}
+
+static void *diana_context_pop(diana_context *c, size_t size)
+{
+    assert(c->top >= size);
+    return c->stack + (c->top -= size);
+}
+
+#define PUTC(c, ch)                                          \
+    do                                                       \
+    {                                                        \
+        *(char *)diana_context_push(c, sizeof(char)) = (ch); \
+    } while (0)
 
 /* 处理白空格ws */
 /* ws = *(%x20 / %x09 / %x0A / %x0D) */
@@ -105,15 +143,41 @@ static int diana_parse_number(diana_context *c, diana_value *v)
     }
 
     errno = 0;
-    v->n = strtod(c->json, NULL);
-    if (errno == ERANGE && (v->n == HUGE_VAL || v->n == -HUGE_VAL))
+    v->u.n = strtod(c->json, NULL);
+    if (errno == ERANGE && (v->u.n == HUGE_VAL || v->u.n == -HUGE_VAL))
         return DIANA_PARSE_NUMBER_TOO_BIG;
     v->type = DIANA_NUMBER;
     c->json = p;
     return DIANA_PARSE_OK;
 }
 
-/* value = null / false / true / number */
+/* 解析字符串 */
+static int diana_parse_string(diana_context *c, diana_value *v)
+{
+    size_t head = c->top, len;
+    const char *p;
+    EXPECT(c, '\"');
+    p = c->json;
+    for (;;)
+    {
+        char ch = *p++;
+        switch (ch)
+        {
+        case '\"':
+            len = c->top - head;
+            diana_set_string(v, (const char *)diana_context_pop(c, len), len);
+            c->json = p;
+            return DIANA_PARSE_OK;
+        case '\0':
+            c->top = head;
+            return DIANA_PARSE_MISS_QUOTATION_MARK;
+        default:
+            PUTC(c, ch);
+        }
+    }
+}
+
+/* value = null / false / true / number / string */
 static int diana_parse_value(diana_context *c, diana_value *v)
 {
     switch (*c->json)
@@ -126,6 +190,8 @@ static int diana_parse_value(diana_context *c, diana_value *v)
         return diana_parse_literal(c, v, "null", DIANA_NULL);
     default:
         return diana_parse_number(c, v);
+    case '"':
+        return diana_parse_string(c, v);
     case '\0':
         return DIANA_PARSE_EXPECT_VALUE;
     }
@@ -139,7 +205,10 @@ int diana_parse(diana_value *v, const char *json)
     int ret;
     assert(v != NULL);
     c.json = json;
-    v->type = DIANA_NULL;
+    /* 初始化堆栈 */
+    c.stack = NULL;
+    c.size = c.top = 0;
+    diana_init(v);
     diana_parse_whitespace(&c);
     if ((ret = diana_parse_value(&c, v)) == DIANA_PARSE_OK)
     {
@@ -150,7 +219,17 @@ int diana_parse(diana_value *v, const char *json)
             ret = DIANA_PARSE_ROOT_NOT_SINGULAR;
         }
     }
+    assert(c.top == 0);
+    free(c.stack);
     return ret;
+}
+
+void diana_free(diana_value *v)
+{
+    assert(v != NULL);
+    if (v->type == DIANA_STRING)
+        free(v->u.s.s);
+    v->type = DIANA_NULL; // 类型置为null，避免重复释放
 }
 
 diana_type diana_get_type(const diana_value *v)
@@ -159,8 +238,51 @@ diana_type diana_get_type(const diana_value *v)
     return v->type;
 }
 
+int diana_get_boolean(const diana_value *v)
+{
+    /* TODO */
+    assert(v != NULL && (v->type == DIANA_TRUE || v->type == DIANA_FALSE));
+    return v->type == DIANA_TRUE ? 1 : 0;
+}
+
+void diana_set_boolean(diana_value *v, int b)
+{
+    /* TODO */
+    assert(v != NULL && (b == 0 || b == 1));
+    v->type = (b == 1 ? DIANA_TRUE : DIANA_FALSE);
+}
+
 double diana_get_number(const diana_value *v)
 {
     assert(v != NULL && v->type == DIANA_NUMBER);
-    return v->n;
+    return v->u.n;
+}
+
+void diana_set_number(diana_value *v, double n)
+{
+    /* TODO */
+    assert(v != NULL);
+    v->u.n = n;
+    v->type = DIANA_NUMBER;
+}
+const char *diana_get_string(const diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_STRING);
+    return v->u.s.s;
+}
+size_t diana_get_string_length(const diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_STRING);
+    return v->u.s.len;
+}
+
+void diana_set_string(diana_value *v, const char *s, size_t len)
+{
+    assert(v != NULL && (s != NULL || len == 0)); // 非空指针或者零长度的字符串都是合法的
+    diana_free(v);                                // 首先清空v可能分配到的内存
+    v->u.s.s = (char *)malloc(len + 1);           // 分配字符串内存
+    memcpy(v->u.s.s, s, len);
+    v->u.s.s[len] = '\0';
+    v->u.s.len = len;
+    v->type = DIANA_STRING;
 }
