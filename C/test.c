@@ -174,7 +174,7 @@ static void test_parse_number_too_big()
     TEST_ERROR(DIANA_PARSE_NUMBER_TOO_BIG, "-1e309");
 }
 
-static void test_parse_missing_quotation_mark()
+static void test_parse_miss_quotation_mark()
 {
     TEST_ERROR(DIANA_PARSE_MISS_QUOTATION_MARK, "\"");
     TEST_ERROR(DIANA_PARSE_MISS_QUOTATION_MARK, "\"abc");
@@ -220,6 +220,63 @@ static void test_parse_invalid_unicode_surrogate()
     TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
 }
 
+#if defined(_MSC_VER)
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%Iu")
+#else
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%zu")
+#endif
+
+static void test_parse_array()
+{
+    size_t i, j;
+    diana_value v;
+
+    diana_init(&v);
+    EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v, "[ ]"));
+    EXPECT_EQ_INT(DIANA_ARRAY, diana_get_type(&v));
+    EXPECT_EQ_SIZE_T(0, diana_get_array_size(&v));
+    diana_free(&v);
+
+    diana_init(&v);
+    EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v, "[ null , false , true , 123 , \"abc\" ]"));
+    EXPECT_EQ_INT(DIANA_ARRAY, diana_get_type(&v));
+    EXPECT_EQ_SIZE_T(5, diana_get_array_size(&v));
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(diana_get_array_element(&v, 0)));
+    EXPECT_EQ_INT(DIANA_FALSE, diana_get_type(diana_get_array_element(&v, 1)));
+    EXPECT_EQ_INT(DIANA_TRUE, diana_get_type(diana_get_array_element(&v, 2)));
+    EXPECT_EQ_INT(DIANA_NUMBER, diana_get_type(diana_get_array_element(&v, 3)));
+    EXPECT_EQ_INT(DIANA_STRING, diana_get_type(diana_get_array_element(&v, 4)));
+    EXPECT_EQ_DOUBLE(123.0, diana_get_number(diana_get_array_element(&v, 3)));
+    EXPECT_EQ_STRING("abc", diana_get_string(diana_get_array_element(&v, 4)), diana_get_string_length(diana_get_array_element(&v, 4)));
+    diana_free(&v);
+
+    diana_init(&v);
+    EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"));
+    EXPECT_EQ_INT(DIANA_ARRAY, diana_get_type(&v));
+    EXPECT_EQ_SIZE_T(4, diana_get_array_size(&v));
+    for (i = 0; i < 4; i++)
+    {
+        diana_value *a = diana_get_array_element(&v, i);
+        EXPECT_EQ_INT(DIANA_ARRAY, diana_get_type(a));
+        EXPECT_EQ_SIZE_T(i, diana_get_array_size(a));
+        for (j = 0; j < i; j++)
+        {
+            diana_value *e = diana_get_array_element(a, j);
+            EXPECT_EQ_INT(DIANA_NUMBER, diana_get_type(e));
+            EXPECT_EQ_DOUBLE((double)j, diana_get_number(e));
+        }
+    }
+    diana_free(&v);
+}
+
+static void test_parse_miss_comma_or_square_bracket()
+{
+    TEST_ERROR(DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1");
+    TEST_ERROR(DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}");
+    TEST_ERROR(DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1 2");
+    TEST_ERROR(DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[[]");
+}
+
 static void test_parse()
 {
     test_parse_null();
@@ -227,15 +284,17 @@ static void test_parse()
     test_parse_false();
     test_parse_number();
     test_parse_string();
+    test_parse_array();
     test_parse_expect_value();
     test_parse_invalid_value();
     test_parse_root_not_singular();
     test_parse_number_too_big();
-    test_parse_missing_quotation_mark();
+    test_parse_miss_quotation_mark();
     test_parse_invalid_string_escape();
     test_parse_invalid_string_char();
     test_parse_invalid_unicode_hex();
     test_parse_invalid_unicode_surrogate();
+    test_parse_miss_comma_or_square_bracket();
 }
 
 static void test_access_null()

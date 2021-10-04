@@ -282,7 +282,60 @@ static int diana_parse_string(diana_context *c, diana_value *v)
     }
 }
 
-/* value = null / false / true / number / string */
+static int diana_parse_value(diana_context *c, diana_value *v); /* 前向声明 */
+
+/* 解析数组 */
+static int diana_parse_array(diana_context *c, diana_value *v)
+{
+    size_t i, size = 0;
+    int ret;
+    EXPECT(c, '[');
+    diana_parse_whitespace(c);
+    if (*c->json == ']')
+    {
+        c->json++;
+        v->type = DIANA_ARRAY;
+        v->u.a.size = 0;
+        v->u.a.e = NULL;
+        return DIANA_PARSE_OK;
+    }
+    for (;;)
+    {
+        diana_value e;
+        diana_init(&e);
+        if ((ret = diana_parse_value(c, &e)) != DIANA_PARSE_OK)
+            break;
+        memcpy(diana_context_push(c, sizeof(diana_value)), &e, sizeof(diana_value));
+        size++;
+        diana_parse_whitespace(c);
+        if (*c->json == ',')
+        {
+            c->json++;
+            diana_parse_whitespace(c);
+        }
+        else if (*c->json == ']')
+        {
+            c->json++;
+            v->type = DIANA_ARRAY;
+            v->u.a.size = size;
+            size *= sizeof(diana_value);
+            memcpy(v->u.a.e = (diana_value *)malloc(size), diana_context_pop(c, size), size);
+            return DIANA_PARSE_OK;
+        }
+        else
+        {
+            ret = DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+            break;
+        }
+    }
+
+    /* Pop and free values on the stack */
+    for (i = 0; i < size; i++)
+        diana_free((diana_value *)diana_context_pop(c, sizeof(diana_value)));
+    return ret;
+}
+
+/* value = null / false / true / number / string / array */
 static int diana_parse_value(diana_context *c, diana_value *v)
 {
     switch (*c->json)
@@ -297,6 +350,8 @@ static int diana_parse_value(diana_context *c, diana_value *v)
         return diana_parse_number(c, v);
     case '"':
         return diana_parse_string(c, v);
+    case '[':
+        return diana_parse_array(c, v);
     case '\0':
         return DIANA_PARSE_EXPECT_VALUE;
     }
@@ -331,9 +386,21 @@ int diana_parse(diana_value *v, const char *json)
 
 void diana_free(diana_value *v)
 {
+    size_t i;
     assert(v != NULL);
-    if (v->type == DIANA_STRING)
+    switch (v->type)
+    {
+    case DIANA_STRING:
         free(v->u.s.s);
+        break;
+    case DIANA_ARRAY:
+        for (i = 0; i < v->u.a.size; ++i)
+            diana_free(&v->u.a.e[i]);
+        free(v->u.a.e);
+        break;
+    default:
+        break;
+    }
     v->type = DIANA_NULL; // 类型置为null，避免重复释放
 }
 
@@ -387,4 +454,16 @@ void diana_set_string(diana_value *v, const char *s, size_t len)
     v->u.s.s[len] = '\0';
     v->u.s.len = len;
     v->type = DIANA_STRING;
+}
+size_t diana_get_array_size(const diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_ARRAY);
+    return v->u.a.size;
+}
+
+diana_value *diana_get_array_element(const diana_value *v, size_t index)
+{
+    assert(v != NULL && v->type == DIANA_ARRAY);
+    assert(index < v->u.a.size);
+    return &v->u.a.e[index];
 }

@@ -18,19 +18,25 @@ typedef enum
 
 /* JSON数据结构 */
 /* 树形结构 */
-typedef struct
+typedef struct diana_value diana_value;
+struct diana_value
 {
     union
     {
-        struct
+        struct /* array */
+        {
+            diana_value *e;
+            size_t size;
+        } a;
+        struct /* string */
         {
             char *s;
             size_t len;
-        } s;      /* string */
+        } s;
         double n; /* number */
     } u;
     diana_type type;
-} diana_value; // 树形结构的每个节点使用diana_value表示，也称它为一个值（JSON Value）。
+}; // 树形结构的每个节点使用diana_value表示，也称它为一个值（JSON Value）。
 
 /* JSON解析返回值 */
 enum
@@ -44,7 +50,8 @@ enum
     DIANA_PARSE_INVALID_STRING_ESCAPE,
     DIANA_PARSE_INVALID_STRING_CHAR,
     DIANA_PARSE_INVALID_UNICODE_SURROGATE, //缺乏高代理项或低代理项不合法
-    DIANA_PARSE_INVALID_UNICODE_HEX        //\u后不是4位十六进制数字
+    DIANA_PARSE_INVALID_UNICODE_HEX,       //\u后不是4位十六进制数字
+    DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET
 };
 
 #define diana_init(v)           \
@@ -75,5 +82,9 @@ void diana_set_number(diana_value *v, double n);
 const char *diana_get_string(const diana_value *v);
 size_t diana_get_string_length(const diana_value *v);
 void diana_set_string(diana_value *v, const char *s, size_t len);
+
+/* 数组类型数据 */
+size_t diana_get_array_size(const diana_value *v);
+diana_value *diana_get_array_element(const diana_value *v, size_t index);
 
 #endif /* DIANAJSON_H */
