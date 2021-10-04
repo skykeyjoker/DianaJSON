@@ -118,6 +118,12 @@ static void test_parse_string()
     TEST_STRING("Hello", "\"Hello\"");
     TEST_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
     TEST_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
+    TEST_STRING("Hello\0World", "\"Hello\\u0000World\"");
+    TEST_STRING("\x24", "\"\\u0024\"");                    /* Dollar sign U+0024 */
+    TEST_STRING("\xC2\xA2", "\"\\u00A2\"");                /* Cents sign U+00A2 */
+    TEST_STRING("\xE2\x82\xAC", "\"\\u20AC\"");            /* Euro sign U+20AC */
+    TEST_STRING("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\""); /* G clef sign U+1D11E */
+    TEST_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\""); /* G clef sign U+1D11E */
 }
 
 #define TEST_ERROR(error, json)                        \
@@ -188,6 +194,50 @@ static void test_parse_invalid_string_char()
     TEST_ERROR(DIANA_PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
 }
 
+static void test_parse_invalid_unicode_hex()
+{
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u0\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u01\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u012\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u/000\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\uG000\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u0/00\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u0G00\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u00/0\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u00G0\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u000/\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u000G\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_HEX, "\"\\u 123\"");
+}
+
+static void test_parse_invalid_unicode_surrogate()
+{
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"");
+    TEST_ERROR(DIANA_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
+}
+
+static void test_parse()
+{
+    test_parse_null();
+    test_parse_true();
+    test_parse_false();
+    test_parse_number();
+    test_parse_string();
+    test_parse_expect_value();
+    test_parse_invalid_value();
+    test_parse_root_not_singular();
+    test_parse_number_too_big();
+    test_parse_missing_quotation_mark();
+    test_parse_invalid_string_escape();
+    test_parse_invalid_string_char();
+    test_parse_invalid_unicode_hex();
+    test_parse_invalid_unicode_surrogate();
+}
+
 static void test_access_null()
 {
     diana_value v;
@@ -231,21 +281,8 @@ static void test_access_string()
     diana_free(&v);
 }
 
-static void test_parse()
+static void test_access()
 {
-    test_parse_null();
-    test_parse_true();
-    test_parse_false();
-    test_parse_number();
-    test_parse_string();
-    test_parse_expect_value();
-    test_parse_invalid_value();
-    test_parse_root_not_singular();
-    test_parse_number_too_big();
-    test_parse_missing_quotation_mark();
-    test_parse_invalid_string_escape();
-    test_parse_invalid_string_char();
-
     test_access_null();
     test_access_boolean();
     test_access_number();
@@ -255,6 +292,7 @@ static void test_parse()
 int main()
 {
     test_parse();
+    test_access();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;
 }
