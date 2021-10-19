@@ -2,6 +2,7 @@
 #include <assert.h> /* assert() */
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>  /* sprintf */
 #include <errno.h>  /* errno, ERANGE */
 #include <math.h>   /* HUGE_VAL */
 #include <string.h> /* memcpy() */
@@ -9,6 +10,11 @@
 /* 使用者可在编译选项中自行设置DIANA_PARSE_STACK_INIT_SIZE宏 */
 #ifndef DIANA_PARSE_STACK_INIT_SIZE
 #define DIANA_PARSE_STACK_INIT_SIZE 256
+#endif
+
+/* 使用者可在编译选项中自行设置DIANA_PARSE_STRINGIFY_INIT_SIZE宏 */
+#ifndef DIANA_PARSE_STRINGIFY_INIT_SIZE
+#define DIANA_PARSE_STRINGIFY_INIT_SIZE 256
 #endif
 
 #define EXPECT(c, ch)             \
@@ -210,7 +216,6 @@ static void diana_encode_utf8(diana_context *c, unsigned u)
 /* str只想c->stack中的元素 */
 static int diana_parse_string_raw(diana_context *c, char **str, size_t *len)
 {
-    /* TODO */
     unsigned u, u2;
     size_t head = c->top;
     const char *p;
@@ -599,4 +604,126 @@ diana_value *diana_get_object_value(const diana_value *v, size_t index)
     assert(v != NULL && v->type == DIANA_OBJECT);
     assert(index < v->u.o.size);
     return &v->u.o.m[index].v;
+}
+
+#define PUTS(c, s, len) memcpy(diana_context_push(c, len), s, len)
+
+static void diana_stringify_string(diana_context *c, const char *s, size_t len)
+{
+    static const char hex_digits[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    size_t i, size;
+    char *head, *p;
+    assert(s != NULL);
+    p = head = diana_context_push(c, size = len * 6 + 2);
+    *p++ = '"';
+    for (i = 0; i < len; i++)
+    {
+        unsigned char ch = (unsigned char)s[i];
+        switch (ch)
+        {
+        case '\"':
+            *p++ = '\\';
+            *p++ = '\"';
+            break;
+        case '\\':
+            *p++ = '\\';
+            *p++ = '\\';
+            break;
+        case '\b':
+            *p++ = '\\';
+            *p++ = 'b';
+            break;
+        case '\f':
+            *p++ = '\\';
+            *p++ = 'f';
+            break;
+        case '\n':
+            *p++ = '\\';
+            *p++ = 'n';
+            break;
+        case '\r':
+            *p++ = '\\';
+            *p++ = 'r';
+            break;
+        case '\t':
+            *p++ = '\\';
+            *p++ = 't';
+            break;
+        default:
+            if (ch < 0x20)
+            {
+                *p++ = '\\';
+                *p++ = 'u';
+                *p++ = '0';
+                *p++ = '0';
+                *p++ = hex_digits[ch >> 4];
+                *p++ = hex_digits[ch & 15];
+            }
+            else
+                *p++ = s[i];
+        }
+    }
+    *p++ = '"';
+    c->top -= size - (p - head);
+}
+
+static void diana_stringify_value(diana_context *c, const diana_value *v)
+{
+    size_t i;
+    switch (v->type)
+    {
+    case DIANA_NULL:
+        PUTS(c, "null", 4);
+        break;
+    case DIANA_FALSE:
+        PUTS(c, "false", 5);
+        break;
+    case DIANA_TRUE:
+        PUTS(c, "true", 4);
+        break;
+    case DIANA_NUMBER:
+        c->top -= 32 - sprintf(diana_context_push(c, 32), "%.17g", v->u.n);
+        break;
+    case DIANA_STRING:
+        diana_stringify_string(c, v->u.s.s, v->u.s.len);
+        break;
+    case DIANA_ARRAY:
+        PUTC(c, '[');
+        for (i = 0; i < v->u.a.size; i++)
+        {
+            if (i > 0)
+                PUTC(c, ',');
+            diana_stringify_value(c, &v->u.a.e[i]);
+        }
+        PUTC(c, ']');
+        break;
+    case DIANA_OBJECT:
+        PUTC(c, '{');
+        for (i = 0; i < v->u.o.size; i++)
+        {
+            if (i > 0)
+                PUTC(c, ',');
+            diana_stringify_string(c, v->u.o.m[i].k, v->u.o.m[i].klen);
+            PUTC(c, ':');
+            diana_stringify_value(c, &v->u.o.m[i].v);
+        }
+        PUTC(c, '}');
+        break;
+    default:
+        assert(0 && "invalid type");
+    }
+}
+
+/* 生成器 */
+char *diana_stringify(const diana_value *v, size_t *length)
+{
+    diana_context c;
+    assert(v != NULL);
+    c.stack = (char *)malloc(c.size = DIANA_PARSE_STRINGIFY_INIT_SIZE);
+    c.top = 0;
+    diana_stringify_value(&c, v);
+    if (length)
+        *length = c.top;
+    PUTC(&c, '\0');
+    return c.stack;
 }

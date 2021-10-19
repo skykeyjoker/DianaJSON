@@ -69,7 +69,8 @@ enum
     DIANA_PARSE_MISS_COMMA_OR_SQUARE_BRACKET,
     DIANA_PARSE_MISS_KEY,
     DIANA_PARSE_MISS_COLON,
-    DIANA_PARSE_MISS_COMMA_OR_CURLY_BRACKET
+    DIANA_PARSE_MISS_COMMA_OR_CURLY_BRACKET,
+    DIANA_STRINGIFY_OK
 };
 
 #define diana_init(v)           \
@@ -79,6 +80,7 @@ enum
     } while (0) // 初始化类型
 
 /* JSON解析 */
+char *diana_stringify(const diana_value *v, size_t *length);
 int diana_parse(diana_value *v, const char *json); // 解析JSON，根节点指针v是由使用方负责分配
 
 void diana_free(diana_value *v);
@@ -110,5 +112,8 @@ size_t diana_get_object_size(const diana_value *v);
 const char *diana_get_object_key(const diana_value *v, size_t index);
 size_t diana_get_object_key_length(const diana_value *v, size_t index);
 diana_value *diana_get_object_value(const diana_value *v, size_t index);
+
+/* 生成器 */
+// int diana_stringify(const diana_value *v, char **json, size_t *length);
 
 #endif /* DIANAJSON_H */
