@@ -28,12 +28,14 @@ struct diana_value
         struct /* member */
         {
             diana_member *m;
-            size_t size;
+            size_t size;     // member count
+            size_t capacity; // capacity
         } o;
         struct /* array */
         {
             diana_value *e;
-            size_t size;
+            size_t size;     // element count
+            size_t capacity; // capacity
         } a;
         struct /* string */
         {
@@ -80,13 +82,15 @@ enum
     } while (0) // 初始化类型
 
 /* JSON解析 */
-char *diana_stringify(const diana_value *v, size_t *length);
 int diana_parse(diana_value *v, const char *json); // 解析JSON，根节点指针v是由使用方负责分配
 
 void diana_free(diana_value *v);
 
 /* 获取访问结果函数，获取其类型 */
 diana_type diana_get_type(const diana_value *v);
+
+/* 相等比较 */
+int diana_is_equal(const diana_value *lhs, const diana_value *rhs);
 
 #define diana_set_null(v) diana_free(v)
 
@@ -104,16 +108,43 @@ size_t diana_get_string_length(const diana_value *v);
 void diana_set_string(diana_value *v, const char *s, size_t len);
 
 /* 数组类型数据 */
+void diana_set_array(diana_value *v, size_t capacity);     // 设置数组的函数，提供初始容量
+void diana_reserve_array(diana_value *v, size_t capacity); // 扩大容量
+void diana_shrink_array(diana_value *v);                   // 数组瘦身
 size_t diana_get_array_size(const diana_value *v);
+size_t diana_get_array_capacity(const diana_value *v);
 diana_value *diana_get_array_element(const diana_value *v, size_t index);
+diana_value *diana_pushback_array_element(diana_value *v);                  // 数组末端加入元素，返回新的元素指针
+void diana_popback_array_element(diana_value *v);                           // 删去数组末端元素
+diana_value *diana_insert_array_element(diana_value *v, size_t index);      // 在index位置插入一个元素，返回新的元素指针
+void diana_erase_array_element(diana_value *v, size_t index, size_t count); // 删去在index位置开始共count个元素（不改变容量）
+void diana_clear_array(diana_value *v);                                     // 清楚所有元素（不改变容量）
 
 /* 对象类型 */
+void diana_set_object(diana_value *v, size_t capacity); // 设置对象的函数，提供初始容量
+void diana_reserve_object();                            // 扩大容量
+void diana_shrink_array(diana_value *v);                // 对象瘦身
+void diana_clear_object(diana_value *v);
 size_t diana_get_object_size(const diana_value *v);
+size_t diana_get_object_capacity(const diana_value *v);
 const char *diana_get_object_key(const diana_value *v, size_t index);
 size_t diana_get_object_key_length(const diana_value *v, size_t index);
 diana_value *diana_get_object_value(const diana_value *v, size_t index);
+size_t diana_find_object_index(const diana_value *v, const char *key, size_t klen);
+diana_value *diana_find_object_value(diana_value *v, const char *key, size_t klen);
+diana_value *diana_set_object_value(diana_value *v, const char *key, size_t klen, const diana_value *value);
+void diana_remove_object_value(diana_value *v, size_t index);
+
+/* 深度复制 */
+void diana_copy(diana_value *dst, const diana_value *src);
+
+/* move */
+void diana_move(diana_value *dst, diana_value *src);
+
+/* 交换值 */
+void diana_swap(diana_value *lhs, diana_value *rhs);
 
 /* 生成器 */
-// int diana_stringify(const diana_value *v, char **json, size_t *length);
+char *diana_stringify(const diana_value *v, size_t *length);
 
 #endif /* DIANAJSON_H */
