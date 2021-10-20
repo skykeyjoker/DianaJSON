@@ -86,6 +86,7 @@ enum
 /* JSON解析 */
 int diana_parse(diana_value *v, const char *json); // 解析JSON，根节点指针v是由使用方负责分配
 
+/* 释放数据 */
 void diana_free(diana_value *v);
 
 /* 获取访问结果函数，获取其类型 */
