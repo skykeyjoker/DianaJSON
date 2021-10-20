@@ -370,9 +370,10 @@ static int diana_parse_object(diana_context *c, diana_value *v)
     if (*c->json == '}') // 空对象
     {
         c->json++;
-        v->type = DIANA_OBJECT;
-        v->u.o.m = 0;
-        v->u.o.size = 0;
+        // v->type = DIANA_OBJECT;
+        // v->u.o.m = 0;
+        // v->u.o.size = 0;
+        diana_set_object(v, 0);
         return DIANA_PARSE_OK;
     }
     m.k = NULL;
@@ -415,11 +416,14 @@ static int diana_parse_object(diana_context *c, diana_value *v)
         }
         else if (*c->json == '}')
         {
-            size_t s = sizeof(diana_member) * size;
+            // size_t s = sizeof(diana_member) * size;
             c->json++;
-            v->type = DIANA_OBJECT;
+            // v->type = DIANA_OBJECT;
+            // v->u.o.size = size;
+            diana_set_object(v, size);
+            // memcpy(v->u.o.m = (diana_member *)malloc(s), diana_context_pop(c, s), s);
+            memcpy(v->u.o.m, diana_context_pop(c, sizeof(diana_member) * size), sizeof(diana_member) * size);
             v->u.o.size = size;
-            memcpy(v->u.o.m = (diana_member *)malloc(s), diana_context_pop(c, s), s);
             return DIANA_PARSE_OK;
         }
         else
@@ -509,6 +513,7 @@ void diana_free(diana_value *v)
         for (i = 0; i < v->u.o.size; i++)
         {
             free(v->u.o.m[i].k);
+            v->u.o.m[i].klen = 0;
             diana_free(&v->u.o.m[i].v);
         }
         free(v->u.o.m);
@@ -583,6 +588,10 @@ void diana_set_array(diana_value *v, size_t capacity)
 
 void diana_reserve_array(diana_value *v, size_t capacity)
 {
+    if (v == NULL)
+        printf("v is null!\n");
+    if (v->type != DIANA_ARRAY)
+        printf("v->type != DIANA_ARRAY!\n");
     assert(v != NULL && v->type == DIANA_ARRAY);
     if (v->u.a.capacity < capacity)
     {
@@ -646,10 +655,13 @@ diana_value *diana_insert_array_element(diana_value *v, size_t index)
         return diana_pushback_array_element(v);
 
     // 插入数组中间
+    // 0 1 2 3 4
+    // 0 1 2 5 3 4
     diana_value *temp = (diana_value *)malloc(sizeof(diana_value) * (v->u.a.size - index));
     memcpy(temp, v->u.a.e + index, sizeof(diana_value) * (v->u.a.size - index));
     memcpy(v->u.a.e + index + 1, temp, sizeof(diana_value) * (v->u.a.size - index));
     v->u.a.size++;
+    diana_free(&v->u.a.e[index]);
     diana_init(&v->u.a.e[index]);
     free(temp);
     return &v->u.a.e[index];
@@ -670,9 +682,13 @@ void diana_erase_array_element(diana_value *v, size_t index, size_t count)
     if (index + count < v->u.a.size)
     {
         diana_value *temp = (diana_value *)malloc(sizeof(diana_value) * (v->u.a.size - index - count));
-        memcpy(temp, v->u.a.e + index + count + 1, sizeof(diana_value) * (v->u.a.size - index - count));
+        memcpy(temp, v->u.a.e + index + count, sizeof(diana_value) * (v->u.a.size - index - count));
         memcpy(v->u.a.e + index, temp, sizeof(diana_value) * (v->u.a.size - index - count));
         free(temp);
+
+        // TODO diana_init移动后多余的节点
+        // 0 1 2 3 4 5
+        // 0 1 4 5 E E
     }
 
     v->u.a.size -= count;
@@ -683,10 +699,63 @@ void diana_clear_array(diana_value *v)
     diana_erase_array_element(v, 0, v->u.a.size);
 }
 
+void diana_set_object(diana_value *v, size_t capacity)
+{
+    assert(v != NULL);
+    diana_free(v);
+    v->type = DIANA_OBJECT;
+    v->u.o.size = 0;
+    v->u.o.capacity = capacity;
+    v->u.o.m = capacity > 0 ? (diana_member *)malloc(capacity * sizeof(diana_member)) : NULL;
+}
+
 size_t diana_get_object_size(const diana_value *v)
 {
     assert(v != NULL && v->type == DIANA_OBJECT);
     return v->u.o.size;
+}
+
+size_t diana_get_object_capacity(const diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT);
+    return v->u.o.capacity;
+}
+
+void diana_reserve_object(diana_value *v, size_t capacity)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT);
+    /* TODO */
+    if (v->u.o.capacity < capacity)
+    {
+        v->u.o.capacity = capacity;
+        v->u.o.m = (diana_member *)realloc(v->u.o.m, capacity * sizeof(diana_member));
+    }
+}
+
+void diana_shrink_object(diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT);
+    /* TODO */
+    if (v->u.o.capacity > v->u.o.size)
+    {
+        v->u.o.capacity = v->u.o.size;
+        v->u.o.m = (diana_member *)realloc(v->u.o.m, v->u.o.size * sizeof(diana_member));
+    }
+}
+
+void diana_clear_object(diana_value *v)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT);
+    /* TODO */
+    size_t i;
+    for (i = 0; i < v->u.o.size; i++)
+    {
+        // key and value
+        free(v->u.o.m[i].k);
+        v->u.o.m[i].klen = 0;
+        diana_free(&v->u.o.m[i].v);
+    }
+    v->u.o.size = 0;
 }
 
 const char *diana_get_object_key(const diana_value *v, size_t index)
@@ -710,8 +779,6 @@ diana_value *diana_get_object_value(const diana_value *v, size_t index)
     return &v->u.o.m[index].v;
 }
 
-#define DIANA_KEY_NOT_EXIST ((size_t)-1)
-
 size_t diana_find_object_index(const diana_value *v, const char *key, size_t klen)
 {
     size_t i;
@@ -730,6 +797,65 @@ diana_value *diana_find_object_value(diana_value *v, const char *key, size_t kle
     return index != DIANA_KEY_NOT_EXIST ? &v->u.o.m[index].v : NULL;
 }
 
+diana_value *diana_set_object_value(diana_value *v, const char *key, size_t klen)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT && key != NULL);
+    /* TODO */
+    // 先搜寻是否存在该键
+    size_t index = diana_find_object_index(v, key, klen);
+    if (index != DIANA_KEY_NOT_EXIST)
+    {
+        // 键存在
+        // diana_copy(diana_get_object_value(v, index), value);
+        return diana_get_object_value(v, index);
+    }
+    else
+    {
+        // 键不存在，插入新键
+        printf("New key:%s, klen=%zu\n", key, klen);
+
+        if (v->u.o.size == v->u.o.capacity) // 先判断是否需要扩容
+            diana_reserve_object(v, v->u.o.capacity == 0 ? 1 : v->u.o.capacity * 2);
+        // key and value
+        memcpy(v->u.o.m[v->u.o.size].k = (char *)malloc(klen + 1), key, klen);
+        v->u.o.m[v->u.o.size].k[klen] = '\0';
+        v->u.o.m[v->u.o.size].klen = klen;
+
+        diana_init(&v->u.o.m[v->u.o.size].v);
+
+        return &v->u.o.m[v->u.o.size++].v;
+    }
+}
+
+void diana_remove_object_value(diana_value *v, size_t index)
+{
+    assert(v != NULL && v->type == DIANA_OBJECT && index < v->u.o.size);
+    /* TODO */
+
+    // key and value
+    free(v->u.o.m[index].k);
+    v->u.o.m[index].klen = 0;
+    diana_free(&v->u.o.m[index].v);
+
+    // move
+    // 0 1 2 3 4
+    // 0 1 3 4
+    size_t i, tmp;
+    tmp = index;
+    for (i = 0; i < v->u.o.size - index - 1; i++)
+    {
+        // key and value
+        if (v->u.o.m[tmp].k == NULL)
+            v->u.o.m[tmp].k = (char *)malloc(v->u.o.m[tmp + 1].klen);
+        memcpy(v->u.o.m[tmp].k, v->u.o.m[tmp + 1].k, v->u.o.m[tmp + 1].klen);
+        v->u.o.m[tmp].klen = v->u.o.m[tmp + 1].klen;
+        diana_move(&v->u.o.m[tmp].v, &v->u.o.m[tmp + 1].v);
+        tmp++;
+    }
+
+    v->u.o.size--;
+}
+
 int diana_is_equal(const diana_value *lhs, const diana_value *rhs)
 {
     size_t i;
@@ -740,7 +866,7 @@ int diana_is_equal(const diana_value *lhs, const diana_value *rhs)
     {
     case DIANA_STRING:
         return lhs->u.s.len == rhs->u.s.len &&
-               memcpy(lhs->u.s.s, rhs->u.s.s, lhs->u.s.len) == 0;
+               memcmp(lhs->u.s.s, rhs->u.s.s, lhs->u.s.len) == 0;
     case DIANA_NUMBER:
         return lhs->u.n == rhs->u.n;
     case DIANA_ARRAY:
@@ -902,8 +1028,8 @@ void diana_copy(diana_value *dst, const diana_value *src)
         /*TODO*/
         // How to allocate N
         diana_free(dst);
-        dst = (diana_value *)malloc(sizeof(diana_value)); // 给数组对象分配一个新空间
-        dst->type = DIANA_ARRAY;                          // 划分类型为数组
+        // dst = (diana_value *)malloc(sizeof(diana_value)); // 给数组对象分配一个新空间
+        dst->type = DIANA_ARRAY; // 划分类型为数组
         dst->u.a.size = src->u.a.size;
         dst->u.a.e = (diana_value *)malloc(sizeof(diana_value) * src->u.a.size); // 为数组元素中的数据区划分相同大小的空间
         for (i = 0; i < src->u.a.size; i++)
@@ -916,8 +1042,8 @@ void diana_copy(diana_value *dst, const diana_value *src)
         /*TODO*/
         // How to allocate N
         diana_free(dst);
-        dst = (diana_value *)malloc(sizeof(diana_value)); // 给对象分配一个新空间
-        dst->type = DIANA_OBJECT;                         // 划分类型为对象
+        // dst = (diana_value *)malloc(sizeof(diana_value)); // 给对象分配一个新空间
+        dst->type = DIANA_OBJECT; // 划分类型为对象
         dst->u.o.size = src->u.o.size;
         dst->u.o.m = (diana_member *)malloc(sizeof(diana_member) * src->u.o.size); // 为对象元素中的数据区划分相同大小的空间
         for (i = 0; i < src->u.o.size; i++)
@@ -936,9 +1062,16 @@ void diana_copy(diana_value *dst, const diana_value *src)
         break;
     }
 }
+#define NAME(x) #x
 
 void diana_move(diana_value *dst, diana_value *src)
 {
+    if (dst == NULL)
+        printf("dst is null!\n");
+    if (src == NULL)
+        printf("src is null!\n");
+    if (src == dst)
+        printf("src==dst!\n");
     assert(dst != NULL && src != NULL && src != dst);
     diana_free(dst);
     memcpy(dst, src, sizeof(diana_value));

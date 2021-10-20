@@ -16,6 +16,8 @@ typedef enum
     DIANA_OBJECT
 } diana_type; // JSON数据类型
 
+#define DIANA_KEY_NOT_EXIST ((size_t)-1)
+
 /* JSON数据结构 */
 /* 树形结构 */
 typedef struct diana_value diana_value;
@@ -118,12 +120,12 @@ diana_value *diana_pushback_array_element(diana_value *v);                  // �
 void diana_popback_array_element(diana_value *v);                           // 删去数组末端元素
 diana_value *diana_insert_array_element(diana_value *v, size_t index);      // 在index位置插入一个元素，返回新的元素指针
 void diana_erase_array_element(diana_value *v, size_t index, size_t count); // 删去在index位置开始共count个元素（不改变容量）
-void diana_clear_array(diana_value *v);                                     // 清楚所有元素（不改变容量）
+void diana_clear_array(diana_value *v);                                     // 清除所有元素（不改变容量）
 
 /* 对象类型 */
-void diana_set_object(diana_value *v, size_t capacity); // 设置对象的函数，提供初始容量
-void diana_reserve_object();                            // 扩大容量
-void diana_shrink_array(diana_value *v);                // 对象瘦身
+void diana_set_object(diana_value *v, size_t capacity);     // 设置对象的函数，提供初始容量
+void diana_reserve_object(diana_value *v, size_t capacity); // 扩大容量
+void diana_shrink_object(diana_value *v);                   // 对象瘦身
 void diana_clear_object(diana_value *v);
 size_t diana_get_object_size(const diana_value *v);
 size_t diana_get_object_capacity(const diana_value *v);
@@ -132,7 +134,7 @@ size_t diana_get_object_key_length(const diana_value *v, size_t index);
 diana_value *diana_get_object_value(const diana_value *v, size_t index);
 size_t diana_find_object_index(const diana_value *v, const char *key, size_t klen);
 diana_value *diana_find_object_value(diana_value *v, const char *key, size_t klen);
-diana_value *diana_set_object_value(diana_value *v, const char *key, size_t klen, const diana_value *value);
+diana_value *diana_set_object_value(diana_value *v, const char *key, size_t klen); // 设置键值对，先搜寻是否存在现有的键，若存在则直接返回该值的指针，不存在时才新增。
 void diana_remove_object_value(diana_value *v, size_t index);
 
 /* 深度复制 */

@@ -431,16 +431,6 @@ static void test_stringify_number()
     TEST_ROUNDTRIP("-1.7976931348623157e+308");
 }
 
-static void test_access_null()
-{
-    diana_value v;
-    diana_init(&v);
-    diana_set_string(&v, "a", 1);
-    diana_set_null(&v);
-    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
-    diana_free(&v);
-}
-
 static void test_stringify_string()
 {
     TEST_ROUNDTRIP("\"\"");
@@ -471,6 +461,98 @@ static void test_stringify()
     test_stringify_string();
     test_stringify_array();
     test_stringify_object();
+}
+
+#define TEST_EQUAL(json1, json2, equality)                      \
+    do                                                          \
+    {                                                           \
+        diana_value v1, v2;                                     \
+        diana_init(&v1);                                        \
+        diana_init(&v2);                                        \
+        EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v1, json1)); \
+        EXPECT_EQ_INT(DIANA_PARSE_OK, diana_parse(&v2, json2)); \
+        EXPECT_EQ_INT(equality, diana_is_equal(&v1, &v2));      \
+        diana_free(&v1);                                        \
+        diana_free(&v2);                                        \
+    } while (0)
+
+static void test_equal()
+{
+    TEST_EQUAL("true", "true", 1);
+    TEST_EQUAL("true", "false", 0);
+    TEST_EQUAL("false", "false", 1);
+    TEST_EQUAL("null", "null", 1);
+    TEST_EQUAL("null", "0", 0);
+    TEST_EQUAL("123", "123", 1);
+    TEST_EQUAL("123", "456", 0);
+    TEST_EQUAL("\"abc\"", "\"abc\"", 1);
+    TEST_EQUAL("\"abc\"", "\"abcd\"", 0);
+    TEST_EQUAL("[]", "[]", 1);
+    TEST_EQUAL("[]", "null", 0);
+    TEST_EQUAL("[1,2,3]", "[1,2,3]", 1);
+    TEST_EQUAL("[1,2,3]", "[1,2,3,4]", 0);
+    TEST_EQUAL("[[]]", "[[]]", 1);
+    TEST_EQUAL("{}", "{}", 1);
+    TEST_EQUAL("{}", "null", 0);
+    TEST_EQUAL("{}", "[]", 0);
+    TEST_EQUAL("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":2}", 1);
+    TEST_EQUAL("{\"a\":1,\"b\":2}", "{\"b\":2,\"a\":1}", 1);
+    TEST_EQUAL("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":3}", 0);
+    TEST_EQUAL("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":2,\"c\":3}", 0);
+    TEST_EQUAL("{\"a\":{\"b\":{\"c\":{}}}}", "{\"a\":{\"b\":{\"c\":{}}}}", 1);
+    TEST_EQUAL("{\"a\":{\"b\":{\"c\":{}}}}", "{\"a\":{\"b\":{\"c\":[]}}}", 0);
+}
+
+static void test_copy()
+{
+    diana_value v1, v2;
+    diana_init(&v1);
+    diana_parse(&v1, "{\"t\":true,\"f\":false,\"n\":null,\"d\":1.5,\"a\":[1,2,3]}");
+    diana_init(&v2);
+    diana_copy(&v2, &v1);
+    EXPECT_TRUE(diana_is_equal(&v2, &v1));
+    diana_free(&v1);
+    diana_free(&v2);
+}
+
+static void test_move()
+{
+    diana_value v1, v2, v3;
+    diana_init(&v1);
+    diana_parse(&v1, "{\"t\":true,\"f\":false,\"n\":null,\"d\":1.5,\"a\":[1,2,3]}");
+    diana_init(&v2);
+    diana_copy(&v2, &v1);
+    diana_init(&v3);
+    diana_move(&v3, &v2);
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v2));
+    EXPECT_TRUE(diana_is_equal(&v3, &v1));
+    diana_free(&v1);
+    diana_free(&v2);
+    diana_free(&v3);
+}
+
+static void test_swap()
+{
+    diana_value v1, v2;
+    diana_init(&v1);
+    diana_init(&v2);
+    diana_set_string(&v1, "Hello", 5);
+    diana_set_string(&v2, "World!", 6);
+    diana_swap(&v1, &v2);
+    EXPECT_EQ_STRING("World!", diana_get_string(&v1), diana_get_string_length(&v1));
+    EXPECT_EQ_STRING("Hello", diana_get_string(&v2), diana_get_string_length(&v2));
+    diana_free(&v1);
+    diana_free(&v2);
+}
+
+static void test_access_null()
+{
+    diana_value v;
+    diana_init(&v);
+    diana_set_string(&v, "a", 1);
+    diana_set_null(&v);
+    EXPECT_EQ_INT(DIANA_NULL, diana_get_type(&v));
+    diana_free(&v);
 }
 
 static void test_access_boolean()
@@ -506,18 +588,183 @@ static void test_access_string()
     diana_free(&v);
 }
 
+static void test_access_array()
+{
+    diana_value a, e;
+    size_t i, j;
+
+    diana_init(&a);
+
+    for (j = 0; j <= 5; j += 5)
+    {
+        diana_set_array(&a, j);
+        EXPECT_EQ_SIZE_T(0, diana_get_array_size(&a));
+        EXPECT_EQ_SIZE_T(j, diana_get_array_capacity(&a));
+        for (i = 0; i < 10; i++)
+        {
+            diana_init(&e);
+            diana_set_number(&e, i);
+            diana_move(diana_pushback_array_element(&a), &e);
+            diana_free(&e);
+        }
+
+        EXPECT_EQ_SIZE_T(10, diana_get_array_size(&a));
+        for (i = 0; i < 10; i++)
+            EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+    }
+
+    diana_popback_array_element(&a);
+    EXPECT_EQ_SIZE_T(9, diana_get_array_size(&a));
+    for (i = 0; i < 9; i++)
+        EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+
+    diana_erase_array_element(&a, 4, 0);
+    EXPECT_EQ_SIZE_T(9, diana_get_array_size(&a));
+    for (i = 0; i < 9; i++)
+        EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+
+    diana_erase_array_element(&a, 8, 1);
+    EXPECT_EQ_SIZE_T(8, diana_get_array_size(&a));
+    for (i = 0; i < 8; i++)
+        EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+
+    diana_erase_array_element(&a, 0, 2);
+    EXPECT_EQ_SIZE_T(6, diana_get_array_size(&a));
+    for (i = 0; i < 6; i++)
+        EXPECT_EQ_DOUBLE((double)i + 2, diana_get_number(diana_get_array_element(&a, i)));
+
+    //#if 0
+    for (i = 0; i < 2; i++)
+    {
+        diana_init(&e);
+        diana_set_number(&e, i);
+        diana_move(diana_insert_array_element(&a, i), &e);
+        diana_free(&e);
+    }
+    //#endif
+
+    EXPECT_EQ_SIZE_T(8, diana_get_array_size(&a));
+    for (i = 0; i < 8; i++)
+        EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+
+    EXPECT_TRUE(diana_get_array_capacity(&a) > 8);
+    diana_shrink_array(&a);
+    EXPECT_EQ_SIZE_T(8, diana_get_array_capacity(&a));
+    EXPECT_EQ_SIZE_T(8, diana_get_array_size(&a));
+    for (i = 0; i < 8; i++)
+        EXPECT_EQ_DOUBLE((double)i, diana_get_number(diana_get_array_element(&a, i)));
+
+    diana_set_string(&e, "Hello", 5);
+    diana_move(diana_pushback_array_element(&a), &e); /* Test if element is freed */
+    diana_free(&e);
+
+    i = diana_get_array_capacity(&a);
+    diana_clear_array(&a);
+    EXPECT_EQ_SIZE_T(0, diana_get_array_size(&a));
+    EXPECT_EQ_SIZE_T(i, diana_get_array_capacity(&a)); /* capacity remains unchanged */
+    diana_shrink_array(&a);
+    EXPECT_EQ_SIZE_T(0, diana_get_array_capacity(&a));
+
+    diana_free(&a);
+}
+
+static void test_access_object()
+{
+    //#if 0
+    diana_value o, v, *pv;
+    size_t i, j, index;
+
+    diana_init(&o);
+
+    for (j = 0; j <= 5; j += 5)
+    {
+        diana_set_object(&o, j);
+        EXPECT_EQ_SIZE_T(0, diana_get_object_size(&o));
+        EXPECT_EQ_SIZE_T(j, diana_get_object_capacity(&o));
+        for (i = 0; i < 10; i++)
+        {
+            char key[2] = "a";
+            key[0] += i;
+            diana_init(&v);
+            diana_set_number(&v, i);
+            diana_move(diana_set_object_value(&o, key, 1), &v);
+            diana_free(&v);
+        }
+
+        EXPECT_EQ_SIZE_T(10, diana_get_object_size(&o));
+        for (i = 0; i < 10; i++)
+        {
+            char key[] = "a";
+            key[0] += i;
+            index = diana_find_object_index(&o, key, 1);
+            EXPECT_TRUE(index != DIANA_KEY_NOT_EXIST);
+            pv = diana_get_object_value(&o, index);
+            EXPECT_EQ_DOUBLE((double)i, diana_get_number(pv));
+        }
+    }
+
+    index = diana_find_object_index(&o, "j", 1);
+    EXPECT_TRUE(index != DIANA_KEY_NOT_EXIST);
+    diana_remove_object_value(&o, index);
+    index = diana_find_object_index(&o, "j", 1);
+    EXPECT_TRUE(index == DIANA_KEY_NOT_EXIST);
+    EXPECT_EQ_SIZE_T(9, diana_get_object_size(&o));
+
+    index = diana_find_object_index(&o, "a", 1);
+    EXPECT_TRUE(index != DIANA_KEY_NOT_EXIST);
+    diana_remove_object_value(&o, index);
+    index = diana_find_object_index(&o, "a", 1);
+    EXPECT_TRUE(index == DIANA_KEY_NOT_EXIST);
+    EXPECT_EQ_SIZE_T(8, diana_get_object_size(&o));
+
+    EXPECT_TRUE(diana_get_object_capacity(&o) > 8);
+    diana_shrink_object(&o);
+    EXPECT_EQ_SIZE_T(8, diana_get_object_capacity(&o));
+    EXPECT_EQ_SIZE_T(8, diana_get_object_size(&o));
+    for (i = 0; i < 8; i++)
+    {
+        char key[] = "a";
+        key[0] += i + 1;
+        EXPECT_EQ_DOUBLE((double)i + 1, diana_get_number(diana_get_object_value(&o, diana_find_object_index(&o, key, 1))));
+    }
+
+    diana_set_string(&v, "Hello", 5);
+    diana_move(diana_set_object_value(&o, "World", 5), &v); /* Test if element is freed */
+    diana_free(&v);
+
+    pv = diana_find_object_value(&o, "World", 5);
+    EXPECT_TRUE(pv != NULL);
+    EXPECT_EQ_STRING("Hello", diana_get_string(pv), diana_get_string_length(pv));
+
+    i = diana_get_object_capacity(&o);
+    diana_clear_object(&o);
+    EXPECT_EQ_SIZE_T(0, diana_get_object_size(&o));
+    EXPECT_EQ_SIZE_T(i, diana_get_object_capacity(&o)); /* capacity remains unchanged */
+    diana_shrink_object(&o);
+    EXPECT_EQ_SIZE_T(0, diana_get_object_capacity(&o));
+
+    diana_free(&o);
+    //#endif
+}
+
 static void test_access()
 {
     test_access_null();
     test_access_boolean();
     test_access_number();
     test_access_string();
+    test_access_array();
+    test_access_object();
 }
 
 int main()
 {
     test_parse();
     test_stringify();
+    test_equal();
+    test_copy();
+    test_move();
+    test_swap();
     test_access();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-project(DianaJson)
 
-add_executable(DianaJson dianajson.h dianajson.c test.c)
+project(DianaJsonC)
+
+add_executable(DianaJsonC dianajson.h dianajson.c test.c)
