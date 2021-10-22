@@ -34,7 +34,7 @@ namespace DianaJSON
 
     public:
         // 数据类型判断接口
-        JsonValueType getType() const;
+        JsonValueType getType() const noexcept;
         bool isNull() const;
         bool isBoolean() const;
         bool isNumber() const;
@@ -46,9 +46,9 @@ namespace DianaJSON
         // 数据类型转换接口
         bool toBool() const;
         double toDouble() const; // Number类型实际表现为double类型浮点数
-        std::string &toString() const;
-        _array &toArray() const;
-        _object &toObject() const;
+        const std::string &toString() const;
+        const _array &toArray() const;
+        const _object &toObject() const;
 
     private:
         std::unique_ptr<JsonValue> _value; // PIMPL

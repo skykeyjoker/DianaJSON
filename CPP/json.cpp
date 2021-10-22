@@ -8,7 +8,7 @@ namespace DianaJSON
 {
 
     // 数据接口
-    JsonValueType Json::getType() const
+    JsonValueType Json::getType() const noexcept
     {
         return _value->getType();
     }
@@ -45,15 +45,15 @@ namespace DianaJSON
     {
         return _value->toDouble();
     }
-    std::string &Json::toString() const
+    const std::string &Json::toString() const
     {
         return _value->toString();
     }
-    Json::_array &Json::toArray() const
+    const Json::_array &Json::toArray() const
     {
         return _value->toArray();
     }
-    Json::_object &Json::toObject() const
+    const Json::_object &Json::toObject() const
     {
         return _value->toObject();
     }

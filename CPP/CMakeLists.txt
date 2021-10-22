@@ -6,4 +6,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(DianaJsonCPP)
 
-add_executable(DianaJsonCPP json.h json.cpp jsonvalue.h jsonvalue.cpp jsonerr.h parse.h parse.cpp test.cpp)
+add_executable(DianaJsonCPP json.h json.cpp jsonvalue.h jsonvalue.cpp jsonerror.h parse.h parse.cpp test.cpp)

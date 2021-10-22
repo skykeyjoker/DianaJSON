@@ -2,3 +2,7 @@
 *.ilk
 *.pdb
 *.gch
+/C/.idea
+/C/cmake-build-debug
+/CPP/.idea
+/CPP/cmake-build-debug
