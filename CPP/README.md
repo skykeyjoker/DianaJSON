@@ -30,6 +30,45 @@ C++版本的简易JSON解析器实现。
 
 #### 构造函数&析构函数等
 
+对几种数据分别特化构造函数，对String、Array和Object类型的数据还要特化移动构造函数。析构函数使用默认版本即可。
+
+```cpp
+public:
+	// 构造函数
+	Json() : Json(nullptr) {}
+	Json(std::nullptr_t);
+    Json(bool);
+    Json(int n) : Json(1.0 * n) {}
+	Json(double);
+	Json(const char *str) : Json(std::string(str)) {}
+	Json(const std::string &);
+	Json(std::string &&);
+	Json(const Json::_array &);
+	Json(Json::_array &&);
+	Json(const Json::_object &);
+	Json(Json::_object &&);
+
+	Json(void *) = delete;
+
+public:
+	// 析构函数
+	~Json() = default;
+```
+
+同时细化拷贝构造函数、拷贝赋值，移动构造函数、移动赋值。
+
+```cpp
+public:
+	// 拷贝
+	Json(const Json &);                    // 深拷贝
+	Json &operator=(const Json &) noexcept;// 拷贝，交换
+
+public:
+	// 移动
+	Json(Json &&) noexcept;
+	Json *operator=(Json &&) noexcept;
+```
+
 #### 接口
 
 数据类型判断接口：
@@ -57,6 +96,14 @@ const _object &toObject() const;
 Number类型实际表现为double类型浮点数。
 
 以上两种数据类型接口实际转入内部类_value内进行操作。
+
+JSON解析与生成接口：
+
+```cpp
+// 解析与生成器接口
+static Json parse(const std::string &context, std::string &errorText) noexcept;// 解析
+std::string serialize() const noexcept;                                        // 生成器
+```
 
 #### PIMPL模式
 
