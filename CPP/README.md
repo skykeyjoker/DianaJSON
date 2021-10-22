@@ -115,6 +115,10 @@ PIMPL可形成编译防火墙，加速构建并令程序解耦合。
 
 JsonValue作为Json的内部类，具体实现对JSON值的存储和转换。
 
+#### 私有成员
+
+使用`std::variant`，`_val`储存多元数据类型，储存JSON节点值。
+
 #### PIMPL模式
 
 PIMPL设计模式，作为Json内部类。
@@ -184,6 +188,59 @@ Json &operator[](const std::string &key);
 ```
 
 其中，const与非const方法为减少重复代码，仅具体实现const方法后，使用`const_cast`进行转换。
+
+### Parser类
+
+Parser类负责具体的JSON解析实现。
+
+#### 私有成员
+
+两个`const char*`，`_start` `_curr`分别指向JSON字符串的起始位置与当前位置。
+
+#### 构造函数
+
+仅允许从`char*`与`string`两种类型**显式**构造。
+
+该类不允许复制。
+
+#### 接口
+
+解析接口：
+
+仅对外提供`parse()`接口获取JSON解析结果。
+
+JSON文本格式为`ws value ws`，因此需要使用私有方法`parseWhitespace()`处理首尾白空格，并使用私有方法`parseValue()`对JSON值类型进行判断并分发至对应处理方法。
+
+白空格处理接口：
+
+使用`parseWhitespace()`方法处理白空格。
+
+白空格包含` `，`\t`，`\r`，`\n`。
+
+JSON值类型分发接口：
+
+使用`parseValue()`接口判断JSON值类型并分发至对应接口。
+
+对JSON值类型进行判断，可以简单地对该字符串的首字符进行判断，输入的JSON文本的首字符可能有以下值：
+
+* 'n'：null
+* 't'：true
+* 'f'：false
+* '\"'：string
+* '['：array
+* '{'：object
+* '\0'：空字符串（不合法）
+* '0...9...'：number
+
+其中，null，true与false的值都是字面常量，可以统一使用`parseLiteral()`方法进行解析。对于string，array，object与number类型则分别使用`parseString()`
+，`parseArray()`，`parseObject()`和`parseNumber()`接口进行解析。
+
+字面常量解析接口`parseLiteral(const std::string& literal)`
+
+`parseLiteral(const std::string& literal)`用作解析字面常量（null，true，false）。该方法将JSON文本与字面常量`literal`依次对比即可。
+
+数字解析接口`parseNumber()`
+
 
 
 
