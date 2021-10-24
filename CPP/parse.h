@@ -2,7 +2,7 @@
 #define PARSE_H
 
 #include "json.h"
-//#include "jsonerror.h"
+#include "jsonerror.h"
 
 namespace DianaJSON {
 	inline constexpr bool is1to9(char ch) { return ch >= '1' && ch <= '9'; }
@@ -39,6 +39,7 @@ namespace DianaJSON {
 		std::string parseRawString();
 		unsigned parse4hex();
 		std::string encodeUTF8(unsigned u) noexcept;
+		void error(const std::string& msg) const;
 
 	private:
 		const char* _start;

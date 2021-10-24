@@ -1,5 +1,4 @@
 #include "jsonvalue.h"
-//#include "jsonerror.h"
 
 namespace DianaJSON {
 	JsonValueType JsonValue::getType() const noexcept {
@@ -17,22 +16,52 @@ namespace DianaJSON {
 			return JsonValueType::Object;
 	}
 
-	std::nullptr_t JsonValue::toNull() const { return std::get<std::nullptr_t>(_val); }
+	std::nullptr_t JsonValue::toNull() const {
+		try {
+			return std::get<std::nullptr_t>(_val);
+		} catch (const std::bad_variant_access &) {
+			throw JsonException("not a null");
+		}
+	}
 
-	bool JsonValue::toBool() const { return std::get<bool>(_val); }
+	bool JsonValue::toBool() const {
+		try {
+			return std::get<bool>(_val);
+		} catch (const std::bad_variant_access &) {
+			throw JsonException("not a bool");
+		}
+	}
 
-	double JsonValue::toDouble() const { return std::get<double>(_val); }
+	double JsonValue::toDouble() const {
+		try {
+			return std::get<double>(_val);
+		} catch (const std::bad_variant_access &) {
+			throw JsonException("not a double");
+		}
+	}
 
 	const std::string &JsonValue::toString() const {
-		return std::get<std::string>(_val);
+		try {
+			return std::get<std::string>(_val);
+		} catch (std::bad_variant_access &) {
+			throw JsonException("not a string");
+		}
 	}
 
 	const Json::_array &JsonValue::toArray() const {
-		return std::get<Json::_array>(_val);
+		try {
+			return std::get<Json::_array>(_val);
+		} catch (std::bad_variant_access &) {
+			throw JsonException("not a array");
+		}
 	}
 
 	const Json::_object &JsonValue::toObject() const {
-		return std::get<Json::_object>(_val);
+		try {
+			return std::get<Json::_object>(_val);
+		} catch (std::bad_variant_access &) {
+			throw JsonException("not a object");
+		}
 	}
 
 	size_t JsonValue::size() const {
@@ -41,7 +70,7 @@ namespace DianaJSON {
 		else if (std::holds_alternative<Json::_object>(_val))
 			return std::get<Json::_object>(_val).size();
 		else {
-			// TODO 非数组或者对象类型报错
+			throw JsonException("not a array or object");
 		}
 	}
 
@@ -49,7 +78,7 @@ namespace DianaJSON {
 		if (std::holds_alternative<Json::_array>(_val)) {
 			return std::get<Json::_array>(_val)[index];
 		} else {
-			// TODO 非数组类型报错
+			throw JsonException("not a array");
 		}
 	}
 
@@ -61,7 +90,7 @@ namespace DianaJSON {
 		if (std::holds_alternative<Json::_object>(_val)) {
 			return std::get<Json::_object>(_val).at(key);
 		} else {
-			// TODO 非对象类型报错
+			throw JsonException("not a object");
 		}
 	}
 

@@ -126,10 +126,13 @@ namespace DianaJSON {
 	}
 
 	Json Json::parse(const std::string &context, std::string &errorText) noexcept {
-		Parser p(context);
-
-		// TODO 错误返回
-		return p.parse();
+		try {
+			Parser p(context);
+			return p.parse();
+		} catch (JsonException &e) {
+			errorText = e.what();
+			return Json(nullptr);
+		}
 	}
 
 	std::string Json::serialize() const noexcept {

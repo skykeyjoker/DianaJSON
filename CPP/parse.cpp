@@ -25,7 +25,7 @@ namespace DianaJSON {
 			} else if (ch >= 'A' && ch <= 'F') {
 				u |= ch - 'A' + 10;
 			} else {
-				// TODO 非法UNICODE HEX
+				error("INVALID UNICODE HEX");
 			}
 		}
 		return u;
@@ -60,10 +60,10 @@ namespace DianaJSON {
 					_start = ++_curr;
 					return str;
 				case '\0':
-					// TODO 缺少末尾引号
+					error("MISS QUOTATION MARK");
 				default:
 					if (static_cast<unsigned char>(*_curr) < 0x20) {
-						// TODO 非法字符
+						error("INVALID STRING CHAR");
 					}
 					str.push_back(*_curr);
 					break;
@@ -97,21 +97,21 @@ namespace DianaJSON {
 							unsigned u1 = parse4hex();
 							if (u1 >= 0xd800 && u1 <= 0xdbff) {// 高代理区
 								if (*++_curr != '\\') {
-									// TODO 错误代理区
+									error("INVALID UNICODE SURROGATE");
 								}
 								if (*++_curr != 'u') {
-									// TODO 错误代理区
+									error("INVALID UNICODE SURROGATE");
 								}
 								unsigned u2 = parse4hex();// 低代理区
 								if (u2 < 0xdc00 || u2 > 0xdfff) {
-									// TODO 错误代理区
+									error("INVALID UNICODE SURROGATE");
 								}
 								u1 = (((u1 - 0xd800) << 10) | (u2 - 0xdc00)) + 0x10000;
 							}
 							str += encodeUTF8(u1);
 						} break;
 						default: {
-							// TODO 错误字符串文本
+							error("INVALID STRING ESCAPE");
 						}
 					}
 					break;
@@ -135,7 +135,7 @@ namespace DianaJSON {
 			case '{':
 				return parseObject();
 			case '\0':
-				// TODO 非法JSON文本
+				error("EXPECT VALUE");
 				break;
 			default:
 				return parseNumber();
@@ -145,7 +145,7 @@ namespace DianaJSON {
 	Json Parser::parseLiteral(const std::string &literal) {
 		// 解析null，false，true
 		if (strncmp(_curr, literal.c_str(), literal.size()) != 0) {
-			// TODO 非null，false或者true
+			error("INVALID VALUE");
 		}
 		_curr += literal.size();
 		_start = _curr;
@@ -165,7 +165,7 @@ namespace DianaJSON {
 			++_curr;
 		else {
 			if (!is1to9(*_curr)) {
-				// TODO 非法数字文本
+				error("INVALID VALUE");
 			}
 			while (is0to9(*++_curr))
 				;// 通过所有合法数字
@@ -173,7 +173,7 @@ namespace DianaJSON {
 		if (*_curr == '.') {
 			// 小数点后必须是数字
 			if (!is0to9(*++_curr)) {
-				// TODO 非法数字文本
+				error("INVALID VALUE");
 			}
 			while (is0to9(*++_curr))
 				;
@@ -182,7 +182,7 @@ namespace DianaJSON {
 			++_curr;
 			if (*_curr == '-' || *_curr == '+') ++_curr;
 			if (!is0to9(*_curr)) {
-				// TODO 非法数字文本
+				error("INVALID VALUE");
 			}
 			while (is0to9(*++_curr))
 				;
@@ -190,7 +190,7 @@ namespace DianaJSON {
 		// 经过以上步骤后便可确认该数字合法
 		double val = strtod(_start, nullptr);
 		if (fabs(val) == HUGE_VAL) {
-			// TODO 数字过大
+			error("NUMBER TOO BIG");
 		}
 		_start = _curr;
 		return Json(val);
@@ -218,7 +218,7 @@ namespace DianaJSON {
 				_start = ++_curr;
 				return Json(arr);
 			} else {
-				// TODO 错误，缺少逗号或者方括号
+				error("MISS COMMA OR SQUARE BRACKET");
 			}
 		}
 	}
@@ -234,12 +234,12 @@ namespace DianaJSON {
 		while (true) {
 			parseWhitespace();
 			if (*_curr != '"') {
-				// TODO 错误，缺失key
+				error("MISS KEY");
 			}
 			std::string key = parseRawString();
 			parseWhitespace();
 			if (*_curr++ != ':') {
-				// TODO 错误，缺少冒号
+				error("MISS COLON");
 			}
 			parseWhitespace();
 			Json val = parseValue();
@@ -251,7 +251,7 @@ namespace DianaJSON {
 				_start = ++_curr;
 				return Json(obj);
 			} else {
-				// TODO 错误，缺少逗号或者花括号
+				error("MISS COMMA OR CURLY BRACKET");
 			}
 		}
 	}
@@ -262,9 +262,13 @@ namespace DianaJSON {
 		Json json = parseValue();
 		parseWhitespace();
 		if (*_curr) {
-			// TODO 仍剩余部分字符未处理
+			// 仍剩余部分字符未处理
+			error("ROOT NOT SINGULAR");
 		}
 		return json;
+	}
+	void Parser::error(const std::string &msg) const {
+		throw JsonException(msg + ": " + _start);
 	}
 
 }// namespace DianaJSON
