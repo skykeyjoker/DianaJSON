@@ -20,7 +20,7 @@ namespace DianaJSON {
 	// 为JsonValue内部类前向声明（std::unique_ptr）
 	class JsonValue;
 
-	class Json {
+	class Json final {
 	public:
 		// 类型重名
 		using _array = std::vector<Json>;
@@ -44,8 +44,29 @@ namespace DianaJSON {
 		Json(void *) = delete;
 
 	public:
+		// 对象类构造函数
+		// map-like objects (std::map, std::unordered_map, ...)
+		template<
+				class M,
+				typename std::enable_if<
+						std::is_constructible<
+								std::string,
+								decltype(std::declval<M>().begin()->first)>::value &&
+								std::is_constructible<
+										Json, decltype(std::declval<M>().begin()->second)>::value,
+						int>::type = 0>
+		Json(const M &m) : Json(_object(m.begin(), m.end())) {}
+		// vector-like objects (std::list, std::vector, std::set, ...)
+		template<class V,
+				 typename std::enable_if<
+						 std::is_constructible<
+								 Json, decltype(*std::declval<V>().begin())>::value,
+						 int>::type = 0>
+		Json(const V &v) : Json(_array(v.begin(), v.end())) {}
+
+	public:
 		// 析构函数
-		~Json() = default;
+		~Json();
 
 	public:
 		// 拷贝
@@ -55,18 +76,17 @@ namespace DianaJSON {
 	public:
 		// 移动
 		Json(Json &&) noexcept;
-		Json *operator=(Json &&) noexcept;
+		Json &operator=(Json &&) noexcept;
 
 	public:
 		// 数据类型判断接口
-		JsonValueType
-		getType() const noexcept;
-		bool isNull() const;
-		bool isBoolean() const;
-		bool isNumber() const;
-		bool isString() const;
-		bool isArray() const;
-		bool isObject() const;
+		JsonValueType getType() const noexcept;
+		bool isNull() const noexcept;
+		bool isBoolean() const noexcept;
+		bool isNumber() const noexcept;
+		bool isString() const noexcept;
+		bool isArray() const noexcept;
+		bool isObject() const noexcept;
 
 	public:
 		// 数据类型转换接口
@@ -81,10 +101,32 @@ namespace DianaJSON {
 		static Json parse(const std::string &context, std::string &errorText) noexcept;// 解析
 		std::string serialize() const noexcept;                                        // 生成器
 
+	public:
+		// 数组和对象数据接口
+		size_t size() const;
+		// 数组
+		Json &operator[](size_t);
+		const Json &operator[](size_t) const;
+		// 对象
+		Json &operator[](const std::string &);
+		const Json &operator[](const std::string &) const;
+
 	private:
-		std::unique_ptr<JsonValue>
-				_value;// PIMPL
+		std::string serializeString() const noexcept;
+		std::string serializeArray() const noexcept;
+		std::string serializeObject() const noexcept;
+
+	private:
+		std::unique_ptr<JsonValue> _value;// PIMPL
 	};
+
+	inline std::ostream &operator<<(std::ostream &os, const Json &json) {
+		return os << json.serialize();
+	}
+	bool operator==(const Json &, const Json &);
+	inline bool operator!=(const Json &lhs, const Json &rhs) {
+		return !(lhs == rhs);
+	}
 }// namespace DianaJSON
 
 #endif

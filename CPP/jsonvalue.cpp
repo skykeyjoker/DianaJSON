@@ -17,27 +17,7 @@ namespace DianaJSON {
 			return JsonValueType::Object;
 	}
 
-	bool JsonValue::isNull() const {
-		return std::holds_alternative<std::nullptr_t>(_val);
-	}
-
-	bool JsonValue::isBoolean() const { return std::holds_alternative<bool>(_val); }
-
-	bool JsonValue::isString() const {
-		return std::holds_alternative<std::string>(_val);
-	}
-
-	bool JsonValue::isNumber() const {
-		return std::holds_alternative<double>(_val);
-	}
-
-	bool JsonValue::isArray() const {
-		return std::holds_alternative<Json::_array>(_val);
-	}
-
-	bool JsonValue::isObject() const {
-		return std::holds_alternative<Json::_object>(_val);
-	}
+	std::nullptr_t JsonValue::toNull() const { return std::get<std::nullptr_t>(_val); }
 
 	bool JsonValue::toBool() const { return std::get<bool>(_val); }
 

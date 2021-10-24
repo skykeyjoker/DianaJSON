@@ -43,15 +43,10 @@ namespace DianaJSON {
 	public:
 		// 数据类型判断接口
 		JsonValueType getType() const noexcept;
-		bool isNull() const;
-		bool isBoolean() const;
-		bool isNumber() const;
-		bool isString() const;
-		bool isArray() const;
-		bool isObject() const;
 
 	public:
 		// 数据类型转换接口
+		std::nullptr_t toNull() const;
 		bool toBool() const;
 		double toDouble() const;// Number类型实际表现为double类型浮点数
 		const std::string &toString() const;

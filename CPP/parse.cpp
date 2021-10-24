@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 namespace DianaJSON {
@@ -60,6 +61,12 @@ namespace DianaJSON {
 					return str;
 				case '\0':
 					// TODO 缺少末尾引号
+				default:
+					if (static_cast<unsigned char>(*_curr) < 0x20) {
+						// TODO 非法字符
+					}
+					str.push_back(*_curr);
+					break;
 				case '\\':// 转义字符
 					switch (*++_curr) {
 						case '\"':
@@ -75,7 +82,7 @@ namespace DianaJSON {
 							str.push_back('\b');
 							break;
 						case 'f':
-							str.push_back('\b');
+							str.push_back('\f');
 							break;
 						case 'n':
 							str.push_back('\n');
@@ -107,12 +114,6 @@ namespace DianaJSON {
 							// TODO 错误字符串文本
 						}
 					}
-					break;
-				default:
-					if (static_cast<unsigned char>(*_curr) < 0x20) {
-						// TODO 非法字符
-					}
-					str.push_back(*++_curr);
 					break;
 			}
 		}
@@ -149,12 +150,12 @@ namespace DianaJSON {
 		_curr += literal.size();
 		_start = _curr;
 		switch (literal[0]) {
-			case 'n':
-				return Json(nullptr);
 			case 't':
 				return Json(true);
 			case 'f':
 				return Json(false);
+			default:
+				return Json(nullptr);
 		}
 	}
 
@@ -246,7 +247,7 @@ namespace DianaJSON {
 			parseWhitespace();
 			if (*_curr == ',')
 				_curr++;
-			else if (*_curr == ']') {
+			else if (*_curr == '}') {
 				_start = ++_curr;
 				return Json(obj);
 			} else {
