@@ -199,6 +199,62 @@ namespace DianaJSON {
 		return Json(parseRawString());
 	}
 
+	Json Parser::parseArray() {
+		Json::_array arr;
+		++_curr;// 跳过'['
+		parseWhitespace();
+		if (*_curr == ']') {
+			_start = ++_curr;
+			return Json(arr);
+		}
+		while (true) {
+			parseWhitespace();
+			arr.push_back(parseValue());
+			parseWhitespace();
+			if (*_curr == ',')
+				_curr++;
+			else if (*_curr == ']') {
+				_start = ++_curr;
+				return Json(arr);
+			} else {
+				// TODO 错误，缺少逗号或者方括号
+			}
+		}
+	}
+
+	Json Parser::parseObject() {
+		Json::_object obj;
+		++_curr;// 跳过'{'
+		parseWhitespace();
+		if (*_curr == '}') {
+			_start = ++_curr;
+			return Json(obj);
+		}
+		while (true) {
+			parseWhitespace();
+			if (*_curr != '"') {
+				// TODO 错误，缺失key
+			}
+			std::string key = parseRawString();
+			parseWhitespace();
+			if (*_curr++ != ':') {
+				// TODO 错误，缺少冒号
+			}
+			parseWhitespace();
+			Json val = parseValue();
+			obj.insert({key, val});
+			parseWhitespace();
+			if (*_curr == ',')
+				_curr++;
+			else if (*_curr == ']') {
+				_start = ++_curr;
+				return Json(obj);
+			} else {
+				// TODO 错误，缺少逗号或者花括号
+			}
+		}
+	}
+
 	Json Parser::parse() {
 		// Json-text = ws value ws
 		parseWhitespace();
