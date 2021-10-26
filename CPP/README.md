@@ -4,6 +4,29 @@
 
 C++版本的简易JSON解析器实现。
 
+## 特点
+
+* 符合标准的 JSON 解析器和生成器
+* 手写的递归下降解析器（recursive descent parser）
+* 使用 C++ 17 标准
+* 跨平台／编译器（如 Windows／Linux／OS X，vc／gcc／clang）
+* 仅支持 UTF-8 JSON 文本
+* 仅支持以 double 存储 JSON number 类型
+
+## 使用示例
+
+```cpp
+using DianaJSON;
+Json json = Json::parse("{\"n\":123.0,\"s\":\"string\",\"a\":[123,true],\"o\":{\"o1\":null,\"o2\":234}}");
+double = json["n"].toDouble();
+Json::_array arr = json["a"].toArray();
+bool b = arr[1].toBool();
+Json::_object obj = json["o"].toObject();
+double d = obj["o2"].toDouble();
+```
+
+更多使用示例可以`test.cpp`中查看。
+
 ## 设计
 
 统一利用命名空间`namespace DianaJSON`进行作用域隔离。
@@ -241,6 +264,7 @@ JSON值类型分发接口：
 
 数字解析接口`parseNumber()`
 
+通过对数字进行合法性测试后，直接调用库函数`strtod()`进行转换。
 
 
 
